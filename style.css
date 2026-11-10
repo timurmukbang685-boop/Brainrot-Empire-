@@ -1,0 +1,328 @@
+:root {
+    --bg-color: #0b0c10;
+    --card-bg: #1f2833;
+    --accent-green: #00ff66;
+    --accent-purple: #9d4edd;
+    --text-main: #ffffff;
+    --text-muted: #c5c6c7;
+    --rarity-common: #b0c3d9;
+    --rarity-rare: #4b69ff;
+    --rarity-epic: #d32ce6;
+    --rarity-legendary: #eb4b4b;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Outfit', sans-serif;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 40px;
+    background: rgba(31, 40, 51, 0.8);
+    backdrop-filter: blur(10px);
+    border-bottom: 2px solid var(--accent-purple);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.logo {
+    font-size: 28px;
+    font-weight: 900;
+    background: linear-gradient(45deg, var(--accent-green), var(--accent-purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.nav-links {
+    display: flex;
+    gap: 20px;
+}
+
+.nav-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 8px 16px;
+    border-radius: 8px;
+    transition: 0.3s;
+}
+
+.nav-btn.active, .nav-btn:hover {
+    color: #fff;
+    background: rgba(157, 78, 221, 0.2);
+}
+
+.user-balance {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    background: #12181f;
+    padding: 8px 16px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.balance-text {
+    font-weight: 800;
+    font-size: 18px;
+    color: #ffd700;
+}
+
+.deposit-btn {
+    background: linear-gradient(45deg, #00ff66, #00b347);
+    color: #000;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 12px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.deposit-btn:hover {
+    transform: scale(1.05);
+}
+
+main {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px 20px;
+    width: 100%;
+    flex: 1;
+}
+
+.section {
+    display: none;
+}
+
+.section.active {
+    display: block;
+}
+
+/* Cases Grid */
+.cases-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 25px;
+}
+
+.case-card {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 20px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: 0.3s;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+}
+
+.case-card:hover {
+    transform: translateY(-5px);
+    border-color: var(--accent-purple);
+    box-shadow: 0 10px 20px rgba(157, 78, 221, 0.2);
+}
+
+.case-image {
+    width: 150px;
+    height: 150px;
+    object-fit: contain;
+    margin-bottom: 15px;
+}
+
+.case-title {
+    font-size: 20px;
+    font-weight: 800;
+    margin-bottom: 10px;
+}
+
+.case-price {
+    font-size: 16px;
+    color: #ffd700;
+    font-weight: 600;
+}
+
+/* Roulette Modal / Area */
+.roulette-container {
+    position: relative;
+    width: 100%;
+    height: 160px;
+    background: #12181f;
+    border-radius: 16px;
+    overflow: hidden;
+    margin: 30px 0;
+    border: 2px solid var(--accent-purple);
+}
+
+.roulette-marker {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--accent-green);
+    z-index: 10;
+    transform: translateX(-50%);
+    box-shadow: 0 0 10px var(--accent-green);
+}
+
+.roulette-track {
+    display: flex;
+    gap: 10px;
+    position: absolute;
+    left: 0;
+    top: 10px;
+    height: 140px;
+    transition: transform 5s cubic-bezier(0.15, 0.85, 0.35, 1.2);
+}
+
+.item-card {
+    min-width: 120px;
+    height: 140px;
+    background: var(--card-bg);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    border-bottom: 4px solid #fff;
+}
+
+.item-card img {
+    width: 70px;
+    height: 70px;
+    object-fit: contain;
+}
+
+.item-card .item-name {
+    font-size: 12px;
+    font-weight: 700;
+    margin-top: 5px;
+    text-align: center;
+}
+
+/* Upgrader Styles */
+.upgrader-box {
+    background: var(--card-bg);
+    border-radius: 20px;
+    padding: 30px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+}
+
+@media (max-width: 768px) {
+    .upgrader-box {
+        grid-template-columns: 1fr;
+    }
+    header {
+        flex-direction: column;
+        gap: 15px;
+        padding: 15px 20px;
+    }
+}
+
+.upgrader-panel {
+    background: #12181f;
+    padding: 20px;
+    border-radius: 16px;
+    text-align: center;
+}
+
+.multiplier-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #fff;
+    padding: 10px 20px;
+    margin: 5px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.multiplier-btn.active {
+    background: var(--accent-purple);
+    border-color: var(--accent-purple);
+}
+
+/* Modal */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: var(--card-bg);
+    padding: 30px;
+    border-radius: 20px;
+    max-width: 450px;
+    width: 90%;
+    border: 1px solid var(--accent-purple);
+    text-align: center;
+    position: relative;
+}
+
+.close-btn {
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    font-size: 24px;
+    cursor: pointer;
+    color: var(--text-muted);
+}
+
+.tg-info {
+    background: #12181f;
+    padding: 15px;
+    border-radius: 12px;
+    margin: 20px 0;
+    border: 1px dashed var(--accent-green);
+}
+
+.tg-handle {
+    color: var(--accent-green);
+    font-size: 20px;
+    font-weight: 800;
+}
+
+.warning-text {
+    color: #ff4d4d;
+    font-weight: 700;
+    margin-top: 10px;
+}
+
+/* Inventory */
+.inventory-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 15px;
+}

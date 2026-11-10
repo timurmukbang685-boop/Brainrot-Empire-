@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brainrot Empire | Кейсы & Апгрейдер</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header>
+        <div class="logo">BRAINROT EMPIRE</div>
+        <div class="nav-links">
+            <button class="nav-btn active" onclick="switchSection('cases')">Кейсы</button>
+            <button class="nav-btn" onclick="switchSection('upgrader')">Апгрейдер</button>
+            <button class="nav-btn" onclick="switchSection('inventory')">Инвентарь</button>
+        </div>
+        <div class="user-balance">
+            <span>Баланс:</span>
+            <span class="balance-text" id="balance">0 ⭐</span>
+            <button class="deposit-btn" onclick="openDepositModal()">Пополнить</button>
+        </div>
+    </header>
+
+    <main>
+        <!-- СЕКЦИЯ КЕЙСОВ -->
+        <section id="cases-section" class="section active">
+            <h2 style="margin-bottom: 20px;">Выбери Бреинрот Кейс</h2>
+            
+            <div id="roulette-view" style="display: none; text-align: center;">
+                <h3 id="current-case-title">Крутим кейс...</h3>
+                <div class="roulette-container">
+                    <div class="roulette-marker"></div>
+                    <div class="roulette-track" id="roulette-track"></div>
+                </div>
+                <button class="deposit-btn" style="padding: 12px 30px; font-size: 18px;" id="open-btn" onclick="spinCase()">Открыть</button>
+                <button class="nav-btn" onclick="closeRoulette()">Назад к кейсам</button>
+            </div>
+
+            <div class="cases-grid" id="cases-list">
+                <div class="case-card" onclick="selectCase('skibidi', 50)">
+                    <img src="https://api.iconify.design/fluent-emoji:toilet.svg" class="case-image" alt="Skibidi">
+                    <div class="case-title">Skibidi Case</div>
+                    <div class="case-price">50 ⭐</div>
+                </div>
+                <div class="case-card" onclick="selectCase('mewing', 150)">
+                    <img src="https://api.iconify.design/fluent-emoji:moai.svg" class="case-image" alt="Mewing">
+                    <div class="case-title">Mewing Case</div>
+                    <div class="case-price">150 ⭐</div>
+                </div>
+                <div class="case-card" onclick="selectCase('sigma', 500)">
+                    <img src="https://api.iconify.design/fluent-emoji:crown.svg" class="case-image" alt="Sigma">
+                    <div class="case-title">Sigma King Case</div>
+                    <div class="case-price">500 ⭐</div>
+                </div>
+                <div class="case-card" onclick="selectCase('johnpork', 1000)">
+                    <img src="https://api.iconify.design/fluent-emoji:pig-face.svg" class="case-image" alt="John Pork">
+                    <div class="case-title">John Pork Special</div>
+                    <div class="case-price">1000 ⭐</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- СЕКЦИЯ АПГРЕЙДЕРА -->
+        <section id="upgrader-section" class="section">
+            <h2 style="margin-bottom: 20px;">Бреинрот Апгрейдер</h2>
+            <div class="upgrader-box">
+                <div class="upgrader-panel">
+                    <h3>Ваша ставка (Звёзды)</h3>
+                    <input type="number" id="upgrade-amount" value="50" min="10" style="width: 80%; padding: 10px; margin: 20px 0; border-radius: 8px; border: none; font-size: 18px; text-align: center;">
+                    <p>Шанс успеха: <span id="win-chance" style="color: var(--accent-green); font-weight: 800;">50%</span></p>
+                </div>
+                <div class="upgrader-panel">
+                    <h3>Выберите Множитель</h3>
+                    <div style="margin: 20px 0;">
+                        <button class="multiplier-btn active" onclick="setMultiplier(1.5, this)">x1.5</button>
+                        <button class="multiplier-btn" onclick="setMultiplier(2, this)">x2</button>
+                        <button class="multiplier-btn" onclick="setMultiplier(5, this)">x5</button>
+                        <button class="multiplier-btn" onclick="setMultiplier(10, this)">x10</button>
+                    </div>
+                    <button class="deposit-btn" style="width: 100%; padding: 15px; font-size: 18px;" onclick="runUpgrade()">АПГРЕЙД</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- СЕКЦИЯ ИНВЕНТАРЯ -->
+        <section id="inventory-section" class="section">
+            <h2 style="margin-bottom: 20px;">Ваш Инвентарь</h2>
+            <div class="inventory-grid" id="inventory-list">
+                <p style="color: var(--text-muted);">Инвентарь пуст</p>
+            </div>
+        </section>
+    </main>
+
+    <!-- МОДАЛЬНОЕ ОКНО ПОПОЛНЕНИЯ -->
+    <div class="modal" id="deposit-modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeDepositModal()">&times;</span>
+            <h2>Пополнение Звёзд</h2>
+            <p style="margin-top: 10px; color: var(--text-muted);">Для пополнения баланса отправьте Telegram Stars напрямую нашему менеджеру:</p>
+            
+            <div class="tg-info">
+                Переводить сюда: <br>
+                <div class="tg-handle">@JOHNPORK77</div>
+            </div>
+
+            <div class="warning-text">МИНИМАЛЬНОЕ ПОПОЛНЕНИЕ: 50 ЗВЁЗД ⭐</div>
+            <p style="font-size: 12px; color: var(--text-muted); margin-top: 15px;">После отправки звёзд укажите ваш username в сообщении. Баланс начислится в течение 5 минут.</p>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
