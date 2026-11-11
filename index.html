@@ -1,115 +1,136 @@
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Brainrot Empire | Кейсы & Апгрейдер</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brainrot Empire</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#10101c;color:white;font-family:Arial;padding:20px}
+header{text-align:center;padding:20px}
+h1{color:#b58cff}
+.catalog{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:14px;max-width:850px;margin:20px auto}
+.card,.panel{background:#202036;border:1px solid #393953;border-radius:15px;padding:15px;text-align:center}
+.price{color:#ffd45c;font-weight:bold;margin:12px}
+button{background:#8d55ed;color:white;border:0;border-radius:9px;padding:12px;font-weight:bold;cursor:pointer;width:100%;margin:4px 0}
+input{width:100%;padding:13px;border-radius:8px;background:#111;color:white;margin:12px 0}
+.panel{display:none;max-width:500px;margin:25px auto}
+.nick{font-size:24px;color:#65e6a0;font-weight:bold}
+.timer{font-size:38px;color:#ffd45c;margin:18px}
+.small{color:#aaa;font-size:13px}
+</style>
 </head>
 <body>
+<header>
+<h1>👑 BRAINROT EMPIRE</h1>
+<p>Пополняй баланс через трейд Roblox!</p>
+</header>
+<h2 style="text-align:center">🛒 Каталог пополнения</h2>
+<div class="catalog" id="catalog"></div>
+<div class="panel" id="panel">
+<h2 id="selected"></h2>
+<p id="coins"></p>
+<p>Отправь трейд игроку:</p>
+<div class="nick">Timurrrrrr125</div>
+<button onclick="copyNick()">📋 Скопировать ник</button>
+<p class="small">Добавлять в друзья не нужно!</p>
+<input id="player" placeholder="Твой Roblox-ник">
+<button id="start" onclick="startTimer()">Начать пополнение</button>
+<div id="active" style="display:none">
+<div class="timer" id="timer">05:00</div>
+<p>У тебя есть 5 минут на отправку трейда.</p>
+<button onclick="sentTrade()">Я отправил трейд</button>
+</div>
+<p id="message"></p>
+</div>
+<script>
+const items=[
+["Cash or Card",45],
+["Garama and Madundung",50],
+["Fragola la la la",75],
+["Capitano Moby",100],
+["Celestial Pegasus",110],
+["Rosey and Teddy",500],
+["Bumbutron",600],
+["Dragon Caneloni",975]
+];
+let chosen=null,interval=null,endTime=0;
+const catalog=document.getElementById("catalog");
+items.forEach(item=>{
+const card=document.createElement("div");
+card.className="card";
+card.innerHTML=`<h3>${item[0]}</h3><div class="price">🪙 ${item[1]} монет</div><button>Пополнить</button>`;
+card.querySelector("button").onclick=()=>selectItem(item);
+catalog.appendChild(card);
+});
+function selectItem(item){
+chosen=item;
+document.getElementById("panel").style.display="block";
+document.getElementById("selected").textContent=item[0];
+document.getElementById("coins").textContent="Ты получишь: "+item[1]+" монет";
+document.getElementById("active").style.display="none";
+document.getElementById("start").style.display="block";
+document.getElementById("message").textContent="";
+clearInterval(interval);
+document.getElementById("panel").scrollIntoView({behavior:"smooth"});
+}
+function copyNick(){
+if(navigator.clipboard){
+navigator.clipboard.writeText("Timurrrrrr125").then(()=>alert("Ник скопирован!"));
+}else{alert("Твой Roblox-ник: Timurrrrrr125");}
+}
 
-    <header>
-        <div class="logo">BRAINROT EMPIRE</div>
-        <div class="nav-links">
-            <button class="nav-btn active" onclick="switchSection('cases')">Кейсы</button>
-            <button class="nav-btn" onclick="switchSection('upgrader')">Апгрейдер</button>
-            <button class="nav-btn" onclick="switchSection('inventory')">Инвентарь</button>
-        </div>
-        <div class="user-balance">
-            <span>Баланс:</span>
-            <span class="balance-text" id="balance">0 ⭐</span>
-            <button class="deposit-btn" onclick="openDepositModal()">Пополнить</button>
-        </div>
-    </header>
+function startTimer(){
+const player=document.getElementById("player").value.trim();
 
-    <main>
-        <!-- СЕКЦИЯ КЕЙСОВ -->
-        <section id="cases-section" class="section active">
-            <h2 style="margin-bottom: 20px;">Выбери Бреинрот Кейс</h2>
-            
-            <div id="roulette-view" style="display: none; text-align: center;">
-                <h3 id="current-case-title">Крутим кейс...</h3>
-                <div class="roulette-container">
-                    <div class="roulette-marker"></div>
-                    <div class="roulette-track" id="roulette-track"></div>
-                </div>
-                <button class="deposit-btn" style="padding: 12px 30px; font-size: 18px;" id="open-btn" onclick="spinCase()">Открыть</button>
-                <button class="nav-btn" onclick="closeRoulette()">Назад к кейсам</button>
-            </div>
+if(!player){
+alert("Сначала введи свой Roblox-ник!");
+return;
+}
 
-            <div class="cases-grid" id="cases-list">
-                <div class="case-card" onclick="selectCase('skibidi', 50)">
-                    <img src="https://api.iconify.design/fluent-emoji:toilet.svg" class="case-image" alt="Skibidi">
-                    <div class="case-title">Skibidi Case</div>
-                    <div class="case-price">50 ⭐</div>
-                </div>
-                <div class="case-card" onclick="selectCase('mewing', 150)">
-                    <img src="https://api.iconify.design/fluent-emoji:moai.svg" class="case-image" alt="Mewing">
-                    <div class="case-title">Mewing Case</div>
-                    <div class="case-price">150 ⭐</div>
-                </div>
-                <div class="case-card" onclick="selectCase('sigma', 500)">
-                    <img src="https://api.iconify.design/fluent-emoji:crown.svg" class="case-image" alt="Sigma">
-                    <div class="case-title">Sigma King Case</div>
-                    <div class="case-price">500 ⭐</div>
-                </div>
-                <div class="case-card" onclick="selectCase('johnpork', 1000)">
-                    <img src="https://api.iconify.design/fluent-emoji:pig-face.svg" class="case-image" alt="John Pork">
-                    <div class="case-title">John Pork Special</div>
-                    <div class="case-price">1000 ⭐</div>
-                </div>
-            </div>
-        </section>
+if(!chosen)return;
 
-        <!-- СЕКЦИЯ АПГРЕЙДЕРА -->
-        <section id="upgrader-section" class="section">
-            <h2 style="margin-bottom: 20px;">Бреинрот Апгрейдер</h2>
-            <div class="upgrader-box">
-                <div class="upgrader-panel">
-                    <h3>Ваша ставка (Звёзды)</h3>
-                    <input type="number" id="upgrade-amount" value="50" min="10" style="width: 80%; padding: 10px; margin: 20px 0; border-radius: 8px; border: none; font-size: 18px; text-align: center;">
-                    <p>Шанс успеха: <span id="win-chance" style="color: var(--accent-green); font-weight: 800;">50%</span></p>
-                </div>
-                <div class="upgrader-panel">
-                    <h3>Выберите Множитель</h3>
-                    <div style="margin: 20px 0;">
-                        <button class="multiplier-btn active" onclick="setMultiplier(1.5, this)">x1.5</button>
-                        <button class="multiplier-btn" onclick="setMultiplier(2, this)">x2</button>
-                        <button class="multiplier-btn" onclick="setMultiplier(5, this)">x5</button>
-                        <button class="multiplier-btn" onclick="setMultiplier(10, this)">x10</button>
-                    </div>
-                    <button class="deposit-btn" style="width: 100%; padding: 15px; font-size: 18px;" onclick="runUpgrade()">АПГРЕЙД</button>
-                </div>
-            </div>
-        </section>
+endTime=Date.now()+5*60*1000;
 
-        <!-- СЕКЦИЯ ИНВЕНТАРЯ -->
-        <section id="inventory-section" class="section">
-            <h2 style="margin-bottom: 20px;">Ваш Инвентарь</h2>
-            <div class="inventory-grid" id="inventory-list">
-                <p style="color: var(--text-muted);">Инвентарь пуст</p>
-            </div>
-        </section>
-    </main>
+document.getElementById("active").style.display="block";
+document.getElementById("start").style.display="none";
+document.getElementById("message").textContent="";
 
-    <!-- МОДАЛЬНОЕ ОКНО ПОПОЛНЕНИЯ -->
-    <div class="modal" id="deposit-modal">
-        <div class="modal-content">
-            <span class="close-btn" onclick="closeDepositModal()">&times;</span>
-            <h2>Пополнение Звёзд</h2>
-            <p style="margin-top: 10px; color: var(--text-muted);">Для пополнения баланса отправьте Telegram Stars напрямую нашему менеджеру:</p>
-            
-            <div class="tg-info">
-                Переводить сюда: <br>
-                <div class="tg-handle">@JOHNPORK77</div>
-            </div>
+updateTimer();
+interval=setInterval(updateTimer,1000);
+}
 
-            <div class="warning-text">МИНИМАЛЬНОЕ ПОПОЛНЕНИЕ: 50 ЗВЁЗД ⭐</div>
-            <p style="font-size: 12px; color: var(--text-muted); margin-top: 15px;">После отправки звёзд укажите ваш username в сообщении. Баланс начислится в течение 5 минут.</p>
-        </div>
-    </div>
+function updateTimer(){
+const remaining=Math.max(0,Math.ceil((endTime-Date.now())/1000));
+const minutes=Math.floor(remaining/60);
+const seconds=remaining%60;
 
-    <script src="script.js"></script>
+document.getElementById("timer").textContent=
+String(minutes).padStart(2,"0")+":"+
+String(seconds).padStart(2,"0");
+
+if(remaining<=0){
+clearInterval(interval);
+document.getElementById("active").style.display="none";
+document.getElementById("start").style.display="block";
+document.getElementById("message").textContent=
+"Время истекло! Создай новую заявку.";
+}
+}
+
+function sentTrade(){
+if(Date.now()>=endTime){
+updateTimer();
+return;
+}
+
+clearInterval(interval);
+document.getElementById("active").style.display="none";
+document.getElementById("message").textContent=
+"Заявка отправлена! Ожидай проверки администратора.";
+}
+</script>
 </body>
 </html>
+
