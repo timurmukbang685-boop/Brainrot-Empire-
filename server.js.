@@ -249,3 +249,267 @@ app.post("/api/topups", async (req, res) => {
   }
 });
 
+
+app.get("/api/cases/free/status", async (req, res) => {
+  try {
+    const id = getPlayerId(req);
+    if (!id) return res.status(401).json({ error: "Нет ID игрока" });
+
+    const result = await pool.query(
+      "SELECT free_case_at FROM players WHERE id = $1",
+      [id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ error: "Игрок не найден" });
+    }
+
+    const last = result.rows[0].free_case_at;
+    const next = last
+      ? new Date(new Date(last).getTime() + 12 * 60 * 60 * 1000)
+      : null;
+
+    const remainingSeconds = next
+      ? Math.max(0, Math.ceil((next.getTime() - Date.now()) / 1000))
+      : 0;
+
+    res.json({
+      available: remainingSeconds === 0,
+      nextAvailableAt: next,
+      remainingSeconds
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Ошибка бесплатного кейса" });
+  }
+});
+
+app.post("/api/cases/free/open", async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    const id = getPlayerId(req);
+    if (!id) return res.status(401).json({ error: "Нет ID игрока" });
+
+    await client.query("BEGIN");
+
+    const result = await client.query(
+      "SELECT balance, free_case_at FROM players WHERE id = $1 FOR UPDATE",
+      [id]
+    );
+
+    if (!result.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Игрок не найден" });
+    }
+
+    const last = result.rows[0].free_case_at;
+
+    if (
+      last &&
+      Date.now() - new Date(last).getTime() < 12 * 60 * 60 * 1000
+    ) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        error: "Бесплатный кейс ещё недоступен"
+      });
+    }
+
+    await client.query(
+      `UPDATE players
+       SET balance = balance + 2, free_case_at = NOW()
+       WHERE id = $1`,
+      [id]
+    );
+
+    await client.query("COMMIT");
+
+    const updated = await pool.query(
+      "SELECT balance, free_case_at FROM players WHERE id = $1",
+      [id]
+    );
+
+    res.json({
+      reward: 2,
+      balance: updated.rows[0].balance,
+      nextAvailableAt: new Date(
+        new Date(updated.rows[0].free_case_at).getTime() +
+        12 * 60 * 60 * 1000
+      )
+    });
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error(error);
+    res.status(500).json({ error: "Ошибка открытия кейса" });
+  } finally {
+    client.release();
+  }
+});
+
+app.post("/api/cases/open", async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    const id = getPlayerId(req);
+    const caseName = req.body.case;
+    const selectedCase = CASES[caseName];
+
+    if (!id) return res.status(401).json({ error: "Нет ID игрока" });
+    if (!selectedCase) {
+      return res.status(400).json({ error: "Кейс не найден" });
+    }
+
+    await client.query("BEGIN");
+
+    const result = await client.query(
+      "SELECT balance FROM players WHERE id = $1 FOR UPDATE",
+      [id]
+    );
+
+    if (!result.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Игрок не найден" });
+    }
+
+    if (result.rows[0].balance < selectedCase.price) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "Недостаточно монет" });
+    }
+
+    const reward = randomReward(selectedCase.rewards);
+
+    await client.query(
+      "UPDATE players SET balance = balance - $1 + $2 WHERE id = $3",
+      [selectedCase.price, reward, id]
+    );
+
+    await client.query(
+      "INSERT INTO case_history (player_id, case_name, reward) VALUES ($1, $2, $3)",
+      [id, caseName, reward]
+    );
+
+    await client.query("COMMIT");
+
+    const updated = await pool.query(
+      "SELECT balance FROM players WHERE id = $1",
+      [id]
+    );
+
+    res.json({ reward, balance: updated.rows[0].balance });
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error(error);
+    res.status(500).json({ error: "Ошибка открытия кейса" });
+  } finally {
+    client.release();
+  }
+});
+
+if (bot) {
+  bot.action(/^approve_(.+)$/, async (ctx) => {
+    if (String(ctx.from.id) !== String(ADMIN_TELEGRAM_ID)) {
+      return ctx.answerCbQuery("Нет доступа");
+    }
+
+    const id = ctx.match[1];
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      const result = await client.query(
+        `SELECT * FROM topup_requests
+         WHERE id = $1 AND status = 'pending'
+         AND created_at > NOW() - INTERVAL '5 minutes'
+         FOR UPDATE`,
+        [id]
+      );
+
+      if (!result.rows.length) {
+        await client.query("ROLLBACK");
+        return ctx.answerCbQuery("Заявка не найдена или истекла");
+      }
+
+      const request = result.rows[0];
+
+      await client.query(
+        "UPDATE players SET balance = balance + $1 WHERE id = $2",
+        [request.coins, request.player_id]
+      );
+
+      await client.query(
+        "UPDATE topup_requests SET status = 'approved' WHERE id = $1",
+        [id]
+      );
+
+      await client.query("COMMIT");
+
+      await ctx.editMessageText(
+        `✅ Заявка подтверждена!\nИгрок: ${request.player_name}\nНачислено: ${request.coins} монет`
+      );
+
+      await ctx.answerCbQuery("Подтверждено");
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => {});
+      console.error(error);
+      await ctx.answerCbQuery("Ошибка");
+    } finally {
+      client.release();
+    }
+  });
+
+  bot.action(/^reject_(.+)$/, async (ctx) => {
+    if (String(ctx.from.id) !== String(ADMIN_TELEGRAM_ID)) {
+      return ctx.answerCbQuery("Нет доступа");
+    }
+
+    const id = ctx.match[1];
+
+    try {
+      const result = await pool.query(
+        `UPDATE topup_requests
+         SET status = 'rejected'
+         WHERE id = $1 AND status = 'pending'
+         RETURNING player_name`,
+        [id]
+      );
+
+      if (!result.rows.length) {
+        return ctx.answerCbQuery("Заявка не найдена");
+      }
+
+      await ctx.editMessageText(
+        `❌ Заявка отклонена\nИгрок: ${result.rows[0].player_name}`
+      );
+
+      await ctx.answerCbQuery("Отклонено");
+    } catch (error) {
+      console.error(error);
+      await ctx.answerCbQuery("Ошибка");
+    }
+  });
+
+  bot.catch((error) => console.error("Ошибка бота:", error));
+
+  bot.launch().catch(error =>
+    console.error("Не удалось запустить Telegram-бота:", error)
+  );
+}
+
+app.get("/", (req, res) => {
+  res.send("Brainrot Empire server is running!");
+});
+
+initDatabase()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Brainrot Empire запущен на порту ${PORT}`);
+    });
+  })
+  .catch(error => {
+    console.error("Ошибка базы данных:", error);
+    process.exit(1);
+  });
+
+process.once("SIGINT", () => bot && bot.stop("SIGINT"));
+process.once("SIGTERM", () => bot && bot.stop("SIGTERM"));
