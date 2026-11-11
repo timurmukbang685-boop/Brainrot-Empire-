@@ -1,15 +1,20 @@
-
 const express = require("express");
+const cors = require("cors");
 const { Pool } = require("pg");
 const { Telegraf, Markup } = require("telegraf");
+const crypto = require("crypto");
 
 const app = express();
+
+app.use(cors({
+  origin: "https://timurmukbang685-boop.github.io"
+}));
+
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const ADMIN_TELEGRAM_ID = process.env.ADMIN_TELEGRAM_ID;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -32,10 +37,27 @@ const ITEMS = [
 ];
 
 const CASES = {
-  starter: { price: 50, rewards: [10, 25, 50, 100] },
-  premium: { price: 200, rewards: [50, 100, 250, 500] },
-  royal: { price: 500, rewards: [100, 250, 500, 1000] }
+  starter: {
+    price: 50,
+    rewards: [10, 25, 50, 100]
+  },
+  premium: {
+    price: 200,
+    rewards: [50, 100, 250, 500]
+  },
+  royal: {
+    price: 500,
+    rewards: [100, 250, 500, 1000]
+  }
 };
+
+function getPlayerId(req) {
+  return req.headers["x-player-id"];
+}
+
+function randomReward(rewards) {
+  return rewards[Math.floor(Math.random() * rewards.length)];
+}
 
 async function initDatabase() {
   await pool.query(`
@@ -57,12 +79,22 @@ async function initDatabase() {
       id TEXT PRIMARY KEY,
       player_id TEXT NOT NULL,
       player_name TEXT NOT NULL,
-      roblox_username TEXT NOT NULL,
+      roblox_username TEXT NOT NULL DEFAULT '',
       brainrot TEXT NOT NULL,
       coins INTEGER NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       status TEXT NOT NULL DEFAULT 'pending'
     )
+  `);
+
+  await pool.query(`
+    ALTER TABLE topup_requests
+    ADD COLUMN IF NOT EXISTS roblox_username TEXT NOT NULL DEFAULT ''
+  `);
+
+  await pool.query(`
+    ALTER TABLE topup_requests
+    ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending'
   `);
 
   await pool.query(`
@@ -76,24 +108,6 @@ async function initDatabase() {
   `);
 }
 
-function getPlayerId(req) {
-  return req.headers["x-player-id"];
-}
-
-function adminOnly(req, res, next) {
-  if (
-    !ADMIN_PASSWORD ||
-    req.headers["x-admin-password"] !== ADMIN_PASSWORD
-  ) {
-    return res.status(403).json({ error: "Нет доступа" });
-  }
-  next();
-}
-
-function randomReward(rewards) {
-  return rewards[Math.floor(Math.random() * rewards.length)];
-}
-
 async function notifyAdmin(message, keyboard) {
   if (!bot || !ADMIN_TELEGRAM_ID) return;
 
@@ -104,22 +118,23 @@ async function notifyAdmin(message, keyboard) {
       keyboard || {}
     );
   } catch (error) {
-    console.error("Ошибка уведомления Telegram:", error.message);
+    console.error("Telegram error:", error.message);
   }
 }
-
 app.post("/api/register", async (req, res) => {
   try {
     const username = String(req.body.username || "").trim();
 
-    if (username.length < 3 || username.length > 20) {
-      return res.status(400).json({ error: "Имя должно быть от 3 до 20 символов" });
+    if (!/^[A-Za-zА-Яа-яЁё0-9_]{3,20}$/.test(username)) {
+      return res.status(400).json({
+        error: "Имя должно содержать от 3 до 20 символов"
+      });
     }
 
-    const id = require("crypto").randomUUID();
+    const id = crypto.randomUUID();
 
     await pool.query(
-      "INSERT INTO players (id, username) VALUES ($1, $2)",
+      "INSERT INTO players (id, username, balance) VALUES ($1, $2, 0)",
       [id, username]
     );
 
@@ -133,7 +148,10 @@ app.post("/api/register", async (req, res) => {
 app.get("/api/profile", async (req, res) => {
   try {
     const id = getPlayerId(req);
-    if (!id) return res.status(401).json({ error: "Нет ID игрока" });
+
+    if (!id) {
+      return res.status(401).json({ error: "Нет ID игрока" });
+    }
 
     const result = await pool.query(
       "SELECT id, username, balance FROM players WHERE id = $1",
@@ -180,59 +198,65 @@ app.post("/api/topups", async (req, res) => {
     }
 
     const item = ITEMS.find(x => x.name === brainrot);
+
     if (!item) {
       return res.status(400).json({ error: "Товар не найден" });
     }
 
-    await client.query("BEGIN");
-
     const player = await client.query(
-      "SELECT username FROM players WHERE id = $1 FOR UPDATE",
+      "SELECT username FROM players WHERE id = $1",
       [playerId]
     );
 
     if (!player.rows.length) {
-      await client.query("ROLLBACK");
       return res.status(404).json({ error: "Игрок не найден" });
     }
 
     const existing = await client.query(
       `SELECT id FROM topup_requests
-       WHERE player_id = $1 AND status = 'pending'
+       WHERE player_id = $1
+       AND status = 'pending'
        AND created_at > NOW() - INTERVAL '5 minutes'`,
       [playerId]
     );
 
     if (existing.rows.length) {
-      await client.query("ROLLBACK");
       return res.status(400).json({
         error: "У тебя уже есть активная заявка"
       });
     }
 
-    const id = require("crypto").randomUUID();
+    const id = crypto.randomUUID();
 
     await client.query(
       `INSERT INTO topup_requests
        (id, player_id, player_name, roblox_username, brainrot, coins)
        VALUES ($1, $2, $3, $4, $5, $6)`,
-      [id, playerId, player.rows[0].username,
-       robloxUsername, item.name, item.price]
+      [
+        id,
+        playerId,
+        player.rows[0].username,
+        robloxUsername,
+        item.name,
+        item.price
+      ]
     );
 
-    await client.query("COMMIT");
-
     await notifyAdmin(
-      `🛒 НОВАЯ ЗАЯВКА\n\n` +
-      `Игрок: ${player.rows[0].username}\n` +
-      `Roblox: ${robloxUsername}\n` +
-      `Brainrot: ${item.name}\n` +
-      `Цена: ${item.price} монет\n\n` +
-      `ID: ${id}`,
-      Markup.inlineKeyboard([
-        [Markup.button.callback("✅ Подтвердить", `approve_${id}`)],
-        [Markup.button.callback("❌ Отклонить", `reject_${id}`)]
-      ])
+      `🛒 НОВАЯ ЗАЯВКА
+
+Игрок: ${player.rows[0].username}
+Roblox: ${robloxUsername}
+Brainrot: ${item.name}
+Цена: ${item.price} монет
+
+ID: ${id}`,
+      {
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback("✅ Подтвердить", `approve_${id}`)],
+          [Markup.button.callback("❌ Отклонить", `reject_${id}`)]
+        ])
+      }
     );
 
     res.json({
@@ -241,19 +265,19 @@ app.post("/api/topups", async (req, res) => {
       expiresIn: 300
     });
   } catch (error) {
-    await client.query("ROLLBACK").catch(() => {});
     console.error(error);
     res.status(500).json({ error: "Ошибка создания заявки" });
   } finally {
     client.release();
   }
 });
-
-
 app.get("/api/cases/free/status", async (req, res) => {
   try {
     const id = getPlayerId(req);
-    if (!id) return res.status(401).json({ error: "Нет ID игрока" });
+
+    if (!id) {
+      return res.status(401).json({ error: "Нет ID игрока" });
+    }
 
     const result = await pool.query(
       "SELECT free_case_at FROM players WHERE id = $1",
@@ -289,12 +313,15 @@ app.post("/api/cases/free/open", async (req, res) => {
 
   try {
     const id = getPlayerId(req);
-    if (!id) return res.status(401).json({ error: "Нет ID игрока" });
+
+    if (!id) {
+      return res.status(401).json({ error: "Нет ID игрока" });
+    }
 
     await client.query("BEGIN");
 
     const result = await client.query(
-      "SELECT balance, free_case_at FROM players WHERE id = $1 FOR UPDATE",
+      "SELECT id, free_case_at FROM players WHERE id = $1 FOR UPDATE",
       [id]
     );
 
@@ -311,7 +338,7 @@ app.post("/api/cases/free/open", async (req, res) => {
     ) {
       await client.query("ROLLBACK");
       return res.status(400).json({
-        error: "Бесплатный кейс ещё недоступен"
+        error: "Бесплатный кейс пока недоступен"
       });
     }
 
@@ -324,18 +351,9 @@ app.post("/api/cases/free/open", async (req, res) => {
 
     await client.query("COMMIT");
 
-    const updated = await pool.query(
-      "SELECT balance, free_case_at FROM players WHERE id = $1",
-      [id]
-    );
-
     res.json({
       reward: 2,
-      balance: updated.rows[0].balance,
-      nextAvailableAt: new Date(
-        new Date(updated.rows[0].free_case_at).getTime() +
-        12 * 60 * 60 * 1000
-      )
+      message: "Ты получил 2 монеты!"
     });
   } catch (error) {
     await client.query("ROLLBACK").catch(() => {});
@@ -351,10 +369,13 @@ app.post("/api/cases/open", async (req, res) => {
 
   try {
     const id = getPlayerId(req);
-    const caseName = req.body.case;
+    const caseName = String(req.body.caseName || "");
     const selectedCase = CASES[caseName];
 
-    if (!id) return res.status(401).json({ error: "Нет ID игрока" });
+    if (!id) {
+      return res.status(401).json({ error: "Нет ID игрока" });
+    }
+
     if (!selectedCase) {
       return res.status(400).json({ error: "Кейс не найден" });
     }
@@ -384,18 +405,18 @@ app.post("/api/cases/open", async (req, res) => {
     );
 
     await client.query(
-      "INSERT INTO case_history (player_id, case_name, reward) VALUES ($1, $2, $3)",
+      `INSERT INTO case_history (player_id, case_name, reward)
+       VALUES ($1, $2, $3)`,
       [id, caseName, reward]
     );
 
     await client.query("COMMIT");
 
-    const updated = await pool.query(
-      "SELECT balance FROM players WHERE id = $1",
-      [id]
-    );
-
-    res.json({ reward, balance: updated.rows[0].balance });
+    res.json({
+      reward,
+      caseName,
+      message: `Ты выиграл ${reward} монет!`
+    });
   } catch (error) {
     await client.query("ROLLBACK").catch(() => {});
     console.error(error);
@@ -404,65 +425,35 @@ app.post("/api/cases/open", async (req, res) => {
     client.release();
   }
 });
-
 if (bot) {
   bot.action(/^approve_(.+)$/, async (ctx) => {
-    if (String(ctx.from.id) !== String(ADMIN_TELEGRAM_ID)) {
-      return ctx.answerCbQuery("Нет доступа");
-    }
-
     const id = ctx.match[1];
-    const client = await pool.connect();
 
     try {
-      await client.query("BEGIN");
-
-      const result = await client.query(
-        `SELECT * FROM topup_requests
+      const result = await pool.query(
+        `UPDATE topup_requests
+         SET status = 'approved'
          WHERE id = $1 AND status = 'pending'
-         AND created_at > NOW() - INTERVAL '5 minutes'
-         FOR UPDATE`,
+         RETURNING player_id, player_name, brainrot`,
         [id]
       );
 
       if (!result.rows.length) {
-        await client.query("ROLLBACK");
-        return ctx.answerCbQuery("Заявка не найдена или истекла");
+        return ctx.answerCbQuery("Заявка уже обработана");
       }
 
-      const request = result.rows[0];
-
-      await client.query(
-        "UPDATE players SET balance = balance + $1 WHERE id = $2",
-        [request.coins, request.player_id]
-      );
-
-      await client.query(
-        "UPDATE topup_requests SET status = 'approved' WHERE id = $1",
-        [id]
-      );
-
-      await client.query("COMMIT");
-
       await ctx.editMessageText(
-        `✅ Заявка подтверждена!\nИгрок: ${request.player_name}\nНачислено: ${request.coins} монет`
+        `✅ Заявка подтверждена!\nИгрок: ${result.rows[0].player_name}\nBrainrot: ${result.rows[0].brainrot}`
       );
 
       await ctx.answerCbQuery("Подтверждено");
     } catch (error) {
-      await client.query("ROLLBACK").catch(() => {});
       console.error(error);
       await ctx.answerCbQuery("Ошибка");
-    } finally {
-      client.release();
     }
   });
 
   bot.action(/^reject_(.+)$/, async (ctx) => {
-    if (String(ctx.from.id) !== String(ADMIN_TELEGRAM_ID)) {
-      return ctx.answerCbQuery("Нет доступа");
-    }
-
     const id = ctx.match[1];
 
     try {
@@ -475,11 +466,11 @@ if (bot) {
       );
 
       if (!result.rows.length) {
-        return ctx.answerCbQuery("Заявка не найдена");
+        return ctx.answerCbQuery("Заявка уже обработана");
       }
 
       await ctx.editMessageText(
-        `❌ Заявка отклонена\nИгрок: ${result.rows[0].player_name}`
+        `❌ Заявка отклонена!\nИгрок: ${result.rows[0].player_name}`
       );
 
       await ctx.answerCbQuery("Отклонено");
@@ -489,11 +480,9 @@ if (bot) {
     }
   });
 
-  bot.catch((error) => console.error("Ошибка бота:", error));
-
-  bot.launch().catch(error =>
-    console.error("Не удалось запустить Telegram-бота:", error)
-  );
+  bot.launch().catch(error => {
+    console.error("Telegram bot error:", error);
+  });
 }
 
 app.get("/", (req, res) => {
@@ -503,13 +492,13 @@ app.get("/", (req, res) => {
 initDatabase()
   .then(() => {
     app.listen(PORT, () => {
-      console.log(`Brainrot Empire запущен на порту ${PORT}`);
+      console.log(`Brainrot Empire running on port ${PORT}`);
     });
   })
   .catch(error => {
-    console.error("Ошибка базы данных:", error);
+    console.error("Database startup error:", error);
     process.exit(1);
   });
 
-process.once("SIGINT", () => bot && bot.stop("SIGINT"));
-process.once("SIGTERM", () => bot && bot.stop("SIGTERM"));
+process.once("SIGINT", () => bot?.stop("SIGINT"));
+process.once("SIGTERM", () => bot?.stop("SIGTERM"));
