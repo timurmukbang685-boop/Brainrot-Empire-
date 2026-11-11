@@ -10,48 +10,13 @@ app.use(express.json());
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
 if (!BOT_TOKEN) {
-  throw new Error("BOT_TOKEN is not configured");
+  throw new Error("BOT_TOKEN is missing");
 }
 
 const bot = new Telegraf(BOT_TOKEN);
 
-// Создание счёта на 50 Telegram Stars
-app.get("/create-invoice", async (req, res) => {
-  try {
-    const userId = req.query.userId;
-
-    if (!userId || !/^\d+$/.test(userId)) {
-      return res.status(400).json({ error: "Invalid userId" });
-    }
-
-    const link = await bot.telegram.createInvoiceLink({
-      title: "Пополнение Brainrot Empire",
-      description: "50 монет Brainrot Empire",
-      payload: `deposit_${userId}_${Date.now()}`,
-      provider_token: "",
-      currency: "XTR",
-      prices: [{ label: "50 монет", amount: 50 }]
-    });
-
-    res.json({ link });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Не удалось создать счёт" });
-  }
-});
-
-bot.on("pre_checkout_query", async (ctx) => {
-  await ctx.answerPreCheckoutQuery(true);
-});
-
-bot.on("successful_payment", async (ctx) => {
-  const payment = ctx.message.successful_payment;
-  console.log("Оплата Stars:", payment.telegram_payment_charge_id);
-  console.log("Payload:", payment.invoice_payload);
-});
-
 app.get("/", (req, res) => {
-  res.send("Brainrot Empire Bot is running!");
+  res.send("Brainrot Empire server is running!");
 });
 
 app.listen(process.env.PORT || 3000, () => {
