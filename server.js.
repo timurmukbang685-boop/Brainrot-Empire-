@@ -37,18 +37,9 @@ const ITEMS = [
 ];
 
 const CASES = {
-  starter: {
-    price: 50,
-    rewards: [10, 25, 50, 100]
-  },
-  premium: {
-    price: 200,
-    rewards: [50, 100, 250, 500]
-  },
-  royal: {
-    price: 500,
-    rewards: [100, 250, 500, 1000]
-  }
+  starter: { price: 50, rewards: [10, 25, 50, 100] },
+  premium: { price: 200, rewards: [50, 100, 250, 500] },
+  royal: { price: 500, rewards: [100, 250, 500, 1000] }
 };
 
 function getPlayerId(req) {
@@ -251,12 +242,10 @@ Brainrot: ${item.name}
 Цена: ${item.price} монет
 
 ID: ${id}`,
-      {
-        ...Markup.inlineKeyboard([
-          [Markup.button.callback("✅ Подтвердить", `approve_${id}`)],
-          [Markup.button.callback("❌ Отклонить", `reject_${id}`)]
-        ])
-      }
+      Markup.inlineKeyboard([
+        [Markup.button.callback("✅ Подтвердить", `approve_${id}`)],
+        [Markup.button.callback("❌ Отклонить", `reject_${id}`)]
+      ])
     );
 
     res.json({
@@ -427,6 +416,10 @@ app.post("/api/cases/open", async (req, res) => {
 });
 if (bot) {
   bot.action(/^approve_(.+)$/, async (ctx) => {
+    if (String(ctx.from.id) !== String(ADMIN_TELEGRAM_ID)) {
+      return ctx.answerCbQuery("Нет доступа");
+    }
+
     const id = ctx.match[1];
 
     try {
@@ -434,7 +427,7 @@ if (bot) {
         `UPDATE topup_requests
          SET status = 'approved'
          WHERE id = $1 AND status = 'pending'
-         RETURNING player_id, player_name, brainrot`,
+         RETURNING player_name, brainrot`,
         [id]
       );
 
@@ -443,7 +436,9 @@ if (bot) {
       }
 
       await ctx.editMessageText(
-        `✅ Заявка подтверждена!\nИгрок: ${result.rows[0].player_name}\nBrainrot: ${result.rows[0].brainrot}`
+        `✅ Заявка подтверждена!
+Игрок: ${result.rows[0].player_name}
+Brainrot: ${result.rows[0].brainrot}`
       );
 
       await ctx.answerCbQuery("Подтверждено");
@@ -454,6 +449,10 @@ if (bot) {
   });
 
   bot.action(/^reject_(.+)$/, async (ctx) => {
+    if (String(ctx.from.id) !== String(ADMIN_TELEGRAM_ID)) {
+      return ctx.answerCbQuery("Нет доступа");
+    }
+
     const id = ctx.match[1];
 
     try {
@@ -470,7 +469,8 @@ if (bot) {
       }
 
       await ctx.editMessageText(
-        `❌ Заявка отклонена!\nИгрок: ${result.rows[0].player_name}`
+        `❌ Заявка отклонена!
+Игрок: ${result.rows[0].player_name}`
       );
 
       await ctx.answerCbQuery("Отклонено");
@@ -480,9 +480,8 @@ if (bot) {
     }
   });
 
-  bot.launch().catch(error => {
-    console.error("Telegram bot error:", error);
-  });
+  bot.catch(error => console.error("Telegram bot error:", error));
+  bot.launch().catch(error => console.error("Telegram bot launch error:", error));
 }
 
 app.get("/", (req, res) => {
