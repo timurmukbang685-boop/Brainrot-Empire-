@@ -4,133 +4,355 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Brainrot Empire</title>
+<title>Brainrot Empire 👑</title>
 <style>
 *{box-sizing:border-box}
-body{margin:0;background:#10101c;color:white;font-family:Arial;padding:20px}
+body{
+ margin:0;padding:18px;
+ background:#10101c;color:white;
+ font-family:Arial,sans-serif
+}
 header{text-align:center;padding:20px}
-h1{color:#b58cff}
-.catalog{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:14px;max-width:850px;margin:20px auto}
-.card,.panel{background:#202036;border:1px solid #393953;border-radius:15px;padding:15px;text-align:center}
+h1{color:#b58cff;font-size:30px}
+h2{color:#d4baff}
+.panel,.card{
+ background:#202036;border:1px solid #393953;
+ border-radius:16px;padding:17px;margin:14px auto
+}
+.panel{max-width:650px}
+.catalog{
+ display:grid;
+ grid-template-columns:repeat(auto-fit,minmax(145px,1fr));
+ gap:12px;max-width:850px;margin:auto
+}
+.card{text-align:center;margin:0}
+button{
+ background:#8d55ed;color:white;border:0;
+ border-radius:9px;padding:12px;font-weight:bold;
+ width:100%;margin:5px 0;cursor:pointer
+}
+button:disabled{opacity:.5}
+input{
+ width:100%;padding:13px;border-radius:8px;
+ background:#111;color:white;border:1px solid #555;
+ margin:10px 0
+}
 .price{color:#ffd45c;font-weight:bold;margin:12px}
-button{background:#8d55ed;color:white;border:0;border-radius:9px;padding:12px;font-weight:bold;cursor:pointer;width:100%;margin:4px 0}
-input{width:100%;padding:13px;border-radius:8px;background:#111;color:white;margin:12px 0}
-.panel{display:none;max-width:500px;margin:25px auto}
-.nick{font-size:24px;color:#65e6a0;font-weight:bold}
-.timer{font-size:38px;color:#ffd45c;margin:18px}
+.balance{
+ font-size:27px;color:#ffd45c;text-align:center
+}
+.nick{
+ font-size:23px;color:#65e6a0;
+ font-weight:bold;text-align:center
+}
+.timer{font-size:35px;color:#ffd45c;text-align:center}
 .small{color:#aaa;font-size:13px}
+.hidden{display:none!important}
+#message,#topupMessage{
+ white-space:pre-wrap;text-align:center;margin:12px
+}
 </style>
 </head>
 <body>
+
 <header>
 <h1>👑 BRAINROT EMPIRE</h1>
-<p>Пополняй баланс через трейд Roblox!</p>
+<p>Добро пожаловать в империю!</p>
 </header>
-<h2 style="text-align:center">🛒 Каталог пополнения</h2>
+
+<div class="panel" id="login">
+<h2>👤 Регистрация</h2>
+<input id="username" placeholder="Придумай имя игрока">
+<button onclick="register()">Зарегистрироваться</button>
+</div>
+
+<div id="game" class="hidden">
+
+<div class="panel">
+<h2 style="text-align:center">🪙 Твой баланс</h2>
+<div class="balance" id="balance">0 монет</div>
+</div>
+
+<div class="panel">
+<h2>🎁 Бесплатный кейс</h2>
+<p>Получи 2 бесплатные монеты!</p>
+<p class="small">Доступен каждые 12 часов.</p>
+<button id="freeCase" onclick="openFreeCase()">
+🎁 Открыть бесплатно
+</button>
+<div id="freeTimer" class="small"></div>
+</div>
+
+<div class="panel">
+<h2>🎲 Платные кейсы</h2>
+<div id="cases"></div>
+</div>
+
+<h2 style="text-align:center">🛒 Пополнение Brainrot</h2>
 <div class="catalog" id="catalog"></div>
-<div class="panel" id="panel">
+
+<div class="panel hidden" id="topup">
 <h2 id="selected"></h2>
 <p id="coins"></p>
 <p>Отправь трейд игроку:</p>
 <div class="nick">Timurrrrrr125</div>
 <button onclick="copyNick()">📋 Скопировать ник</button>
-<p class="small">Добавлять в друзья не нужно!</p>
 <input id="player" placeholder="Твой Roblox-ник">
-<button id="start" onclick="startTimer()">Начать пополнение</button>
-<div id="active" style="display:none">
+<button id="start" onclick="startTopup()">
+Начать пополнение
+</button>
+<div id="active" class="hidden">
 <div class="timer" id="timer">05:00</div>
 <p>У тебя есть 5 минут на отправку трейда.</p>
 <button onclick="sentTrade()">Я отправил трейд</button>
 </div>
-<p id="message"></p>
+<p id="topupMessage"></p>
 </div>
+
+</div>
+
+<div id="message"></div>
+
 <script>
-const items=[
-["Cash or Card",45],
-["Garama and Madundung",50],
-["Fragola la la la",75],
-["Capitano Moby",100],
-["Celestial Pegasus",110],
-["Rosey and Teddy",500],
-["Bumbutron",600],
-["Dragon Caneloni",975]
+  
+const API = "";
+let playerId = localStorage.getItem("be_player_id");
+let chosen = null;
+let interval = null;
+let endTime = 0;
+let requestId = null;
+
+const items = [
+ ["Cash or Card",45],
+ ["Garama and Madundung",50],
+ ["Fragola la la la",75],
+ ["Capitano Moby",100],
+ ["Celestial Pegasus",110],
+ ["Rosey and Teddy",500],
+ ["Bumbutron",600],
+ ["Dragon Caneloni",975]
 ];
-let chosen=null,interval=null,endTime=0;
-const catalog=document.getElementById("catalog");
-items.forEach(item=>{
-const card=document.createElement("div");
-card.className="card";
-card.innerHTML=`<h3>${item[0]}</h3><div class="price">🪙 ${item[1]} монет</div><button>Пополнить</button>`;
-card.querySelector("button").onclick=()=>selectItem(item);
-catalog.appendChild(card);
-});
+
+async function api(path, options={}) {
+ const response = await fetch(API+path,{
+  ...options,
+  headers:{
+   "Content-Type":"application/json",
+   ...(playerId?{"x-player-id":playerId}:{}),
+   ...(options.headers||{})
+  }
+ });
+ const data = await response.json();
+ if(!response.ok) throw new Error(data.error||"Ошибка сервера");
+ return data;
+}
+
+async function register(){
+ const username=document.getElementById("username").value.trim();
+ if(!username)return alert("Введи имя!");
+
+ try{
+  const data=await api("/api/register",{
+   method:"POST",
+   body:JSON.stringify({username})
+  });
+  playerId=data.id;
+  localStorage.setItem("be_player_id",playerId);
+  await showGame();
+ }catch(e){alert(e.message)}
+}
+
+async function showGame(){
+ try{
+  await refreshBalance();
+  document.getElementById("login").classList.add("hidden");
+  document.getElementById("game").classList.remove("hidden");
+  renderItems();
+  renderCases();
+  await updateFreeTimer();
+  setInterval(updateFreeTimer,1000);
+ }catch(e){
+  localStorage.removeItem("be_player_id");
+  playerId=null;
+  document.getElementById("login").classList.remove("hidden");
+  document.getElementById("game").classList.add("hidden");
+ }
+}
+
+async function refreshBalance(){
+ const data=await api("/api/profile");
+ document.getElementById("balance").textContent=data.balance+" монет";
+}
+
+function renderItems(){
+ const catalog=document.getElementById("catalog");
+ catalog.innerHTML="";
+ items.forEach(item=>{
+  const card=document.createElement("div");
+  card.className="card";
+  card.innerHTML=`<h3>${item[0]}</h3>
+  <div class="price">🪙 ${item[1]} монет</div>
+  <button>Пополнить</button>`;
+  card.querySelector("button").onclick=()=>selectItem(item);
+  catalog.appendChild(card);
+ });
+}
+
+function renderCases(){
+ const cases=[
+  ["starter","🌱 Starter",50],
+  ["premium","💎 Premium",200],
+  ["royal","👑 Royal",500]
+ ];
+ const box=document.getElementById("cases");
+ box.innerHTML="";
+ cases.forEach(c=>{
+  const div=document.createElement("div");
+  div.className="card";
+  div.innerHTML=`<h3>${c[1]}</h3>
+  <div class="price">${c[2]} монет</div>
+  <button>Открыть</button>`;
+  div.querySelector("button").onclick=()=>openCase(c[0]);
+  box.appendChild(div);
+ });
+}
+
+async function openFreeCase(){
+ const button=document.getElementById("freeCase");
+ button.disabled=true;
+ try{
+  const data=await api("/api/cases/free/open",{method:"POST"});
+  alert("🎉 Ты получил "+data.reward+" монеты!");
+  await refreshBalance();
+  await updateFreeTimer();
+ }catch(e){alert(e.message)}
+ button.disabled=false;
+}
+
+async function openCase(name){
+ try{
+  const data=await api("/api/cases/open",{
+   method:"POST",
+   body:JSON.stringify({case:name})
+  });
+  alert("🎉 Выпало "+data.reward+" монет!");
+  await refreshBalance();
+ }catch(e){alert(e.message)}
+}
+
 function selectItem(item){
-chosen=item;
-document.getElementById("panel").style.display="block";
-document.getElementById("selected").textContent=item[0];
-document.getElementById("coins").textContent="Ты получишь: "+item[1]+" монет";
-document.getElementById("active").style.display="none";
-document.getElementById("start").style.display="block";
-document.getElementById("message").textContent="";
-clearInterval(interval);
-document.getElementById("panel").scrollIntoView({behavior:"smooth"});
+ chosen=item;
+ document.getElementById("topup").classList.remove("hidden");
+ document.getElementById("selected").textContent=item[0];
+ document.getElementById("coins").textContent="Стоимость: "+item[1]+" монет";
+ document.getElementById("active").classList.add("hidden");
+ document.getElementById("start").classList.remove("hidden");
+ document.getElementById("topupMessage").textContent="";
+ clearInterval(interval);
+ document.getElementById("topup").scrollIntoView({behavior:"smooth"});
 }
+
 function copyNick(){
-if(navigator.clipboard){
-navigator.clipboard.writeText("Timurrrrrr125").then(()=>alert("Ник скопирован!"));
-}else{alert("Твой Roblox-ник: Timurrrrrr125");}
+ navigator.clipboard.writeText("Timurrrrrr125")
+ .then(()=>alert("Ник скопирован!"))
+ .catch(()=>alert("Твой Roblox-ник: Timurrrrrr125"));
 }
 
-function startTimer(){
-const player=document.getElementById("player").value.trim();
+async function startTopup(){
+ const player=document.getElementById("player").value.trim();
+ if(!/^[A-Za-z0-9_]{3,20}$/.test(player)){
+  return alert("Введи правильный Roblox-ник!");
+ }
+ if(!chosen)return;
 
-if(!player){
-alert("Сначала введи свой Roblox-ник!");
-return;
-}
+ const button=document.getElementById("start");
+ button.disabled=true;
 
-if(!chosen)return;
+ try{
+  const data=await api("/api/topups",{
+   method:"POST",
+   body:JSON.stringify({
+    brainrot:chosen[0],
+    robloxUsername:player
+   })
+  });
 
-endTime=Date.now()+5*60*1000;
-
-document.getElementById("active").style.display="block";
-document.getElementById("start").style.display="none";
-document.getElementById("message").textContent="";
-
-updateTimer();
-interval=setInterval(updateTimer,1000);
-}
-
+  requestId=data.id;
+  endTime=Date.now()+data.expiresIn*1000;
+  document.getElementById("active").classList.remove("hidden");
+  button.classList.add("hidden");
+  document.getElementById("topupMessage").textContent=
+   "Заявка создана! Отправь трейд.";
+  updateTimer();
+  interval=setInterval(updateTimer,1000);
+ }catch(e){
+  alert(e.message);
+ }finally{
+  button.disabled=false;
+ }
+  }
+  
 function updateTimer(){
-const remaining=Math.max(0,Math.ceil((endTime-Date.now())/1000));
-const minutes=Math.floor(remaining/60);
-const seconds=remaining%60;
+ const remaining=Math.max(0,Math.ceil((endTime-Date.now())/1000));
+ const minutes=Math.floor(remaining/60);
+ const seconds=remaining%60;
 
-document.getElementById("timer").textContent=
-String(minutes).padStart(2,"0")+":"+
-String(seconds).padStart(2,"0");
+ document.getElementById("timer").textContent=
+  String(minutes).padStart(2,"0")+":"+
+  String(seconds).padStart(2,"0");
 
-if(remaining<=0){
-clearInterval(interval);
-document.getElementById("active").style.display="none";
-document.getElementById("start").style.display="block";
-document.getElementById("message").textContent=
-"Время истекло! Создай новую заявку.";
-}
-}
-
-function sentTrade(){
-if(Date.now()>=endTime){
-updateTimer();
-return;
+ if(remaining<=0){
+  clearInterval(interval);
+  document.getElementById("active").classList.add("hidden");
+  document.getElementById("start").classList.remove("hidden");
+  document.getElementById("topupMessage").textContent=
+   "Время истекло! Создай новую заявку.";
+  requestId=null;
+ }
 }
 
-clearInterval(interval);
-document.getElementById("active").style.display="none";
-document.getElementById("message").textContent=
-"Заявка отправлена! Ожидай проверки администратора.";
+async function sentTrade(){
+ if(!requestId)return;
+ if(Date.now()>=endTime){
+  updateTimer();
+  return;
+ }
+
+ clearInterval(interval);
+ document.getElementById("active").classList.add("hidden");
+ document.getElementById("topupMessage").textContent=
+  "Трейд отмечен! Ожидай проверки администратора.";
+}
+
+async function updateFreeTimer(){
+ try{
+  const data=await api("/api/cases/free/status");
+  const button=document.getElementById("freeCase");
+  const timer=document.getElementById("freeTimer");
+
+  if(data.available){
+   button.disabled=false;
+   timer.textContent="Кейс доступен!";
+  }else{
+   button.disabled=true;
+   const seconds=Math.max(0,Math.ceil(data.remainingSeconds));
+   const hours=Math.floor(seconds/3600);
+   const minutes=Math.floor((seconds%3600)/60);
+   const secs=seconds%60;
+   timer.textContent="Следующий кейс через "+
+    String(hours).padStart(2,"0")+":"+
+    String(minutes).padStart(2,"0")+":"+
+    String(secs).padStart(2,"0");
+  }
+ }catch(e){
+  document.getElementById("freeTimer").textContent=
+   "Не удалось проверить бесплатный кейс.";
+ }
+}
+
+if(playerId){
+ showGame();
 }
 </script>
 </body>
 </html>
-
